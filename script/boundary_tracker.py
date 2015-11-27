@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Point32
 
 from vicon.msg import Subject
+from robot_drawer import RobotDrawer
 
 goal = Point32()
 goal.x = 0.0000001
@@ -24,6 +25,9 @@ P_TRACKING = 0.70
 
 pose = None
 
+import matplotlib
+import matplotlib.pyplot as plt
+plt.ion() # set plot to animated
 
 def localization_callback(loc):
     global pose
@@ -49,12 +53,16 @@ def run():
     Attrac = .1
 
 
+    drawer = RobotDrawer()
+
     # ####### Control Loop ###########
     while not rospy.is_shutdown():
         rospy.sleep(0.1)
 
         if pose is None:
-            print 'Error: no localization.'
+            r =np.random.random(3)
+            drawer.update_robots([r])
+            print 'Error: no localization.1'
             continue
 
         # Robot pose

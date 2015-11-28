@@ -9,7 +9,6 @@ from geometry_msgs.msg import Point32
 
 from vicon.msg import Subject
 from robot_drawer import RobotDrawer
-import pickle
 
 goal = Point32()
 goal.x = 0.0000001
@@ -50,17 +49,11 @@ def run():
     velPub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
 
-    # Load boundaries
-    boundaries = pickle.load(open("boundary.p", "rb"))
-    boundary_time = 0
-
-
     # Desired angular speed
-    Omeg = .1
+    Omeg = .5
     # attarction
-    Attrac = .1
+    Attrac = 1.5
 
-    ka = 1.1
 
     drawer = RobotDrawer()
 
@@ -68,19 +61,14 @@ def run():
     while not rospy.is_shutdown():
         rospy.sleep(0.1)
 
-
-
-        boundary = np.array(boundaries[50])
-        boundary[:,0] -= 1
-        boundary[:,1] -= .7
-        boundary[:] *= 1.5
-
-        drawer.draw_polygons([boundary])
-
         if pose is None:
             print 'Error: no localization.1'
             continue
 
+        theta = np.linspace(0, 2 * pi, 50)
+        boundary = [(cos(th1), sin(th1)) for th1 in theta]
+
+        drawer.draw_polygons([boundary])
 
         # Robot pose
         rx, ry = pose.position.x, pose.position.y
@@ -95,7 +83,7 @@ def run():
         # Tangent
         vt = np.array([-sin(map_theta), cos(map_theta)])
         # Atractor to the unitary radious
-        vr = ka * (np.array([cos(map_theta), sin(map_theta)]) - np.array([rx, ry]))
+        vr = np.array([cos(map_theta), sin(map_theta)]) - np.array([rx, ry])
 
         # Total vector
         vtotal = Attrac * vr + Omeg * vt

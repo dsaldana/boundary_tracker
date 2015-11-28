@@ -2,6 +2,7 @@ import math
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class RobotDrawer(object):
@@ -14,6 +15,7 @@ class RobotDrawer(object):
         plt.xlim(xlim)
 
         self.grobots = None
+        self.gpolygons = None
         plt.draw()
 
     def init_grobots(self, robots, rad=.51):
@@ -27,6 +29,16 @@ class RobotDrawer(object):
 
         return grobots
 
+    def init_polygons(self, polygons):
+        gpolygons = []
+
+        for points in polygons:
+            np_points = np.array(points)
+            gpol = plt.plot(np_points[:, 0], np_points[:, 1])
+            gpolygons.append(gpol)
+
+        return gpolygons
+
     def update_robots(self, robots, rad=.51):
         if self.grobots is None:
             self.grobots = self.init_grobots(robots)
@@ -38,6 +50,16 @@ class RobotDrawer(object):
             rline[0].set_ydata([ry, ry + rad * math.sin(rth)])
         plt.draw()
 
+    def draw_polygons(self, polygons):
+        if self.gpolygons is None:
+            self.gpolygons = self.init_polygons(polygons)
+
+        for gpol, points in zip(self.gpolygons, polygons):
+
+            np_points = np.array(points)
+            gpol[0].set_xdata(np_points[:, 0])
+            gpol[0].set_ydata(np_points[:, 1])
+        plt.draw()
 
 ###### TEST #############
 # drawer = RobotDrawer()

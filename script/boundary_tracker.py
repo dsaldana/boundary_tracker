@@ -10,6 +10,10 @@ from geometry_msgs.msg import Point32
 from vicon.msg import Subject
 from robot_drawer import RobotDrawer
 import pickle
+from shapely.geometry import Polygon, LinearRing, Point, LineString
+from numpy import linalg as LA
+
+
 
 goal = Point32()
 goal.x = 0.0000001
@@ -56,11 +60,10 @@ def run():
 
 
     # Desired angular speed
-    Omeg = .1
+    Omeg = .3
     # attarction
-    Attrac = .1
+    Attrac = 2.
 
-    ka = 1.1
 
     drawer = RobotDrawer()
 
@@ -68,11 +71,9 @@ def run():
     while not rospy.is_shutdown():
         rospy.sleep(0.1)
 
-
-
-        boundary = np.array(boundaries[50])
-        boundary[:,0] -= 1
-        boundary[:,1] -= .7
+        boundary = np.array(boundaries[149])
+        boundary[:, 0] -= 1
+        boundary[:, 1] -= .7
         boundary[:] *= 1.5
 
         drawer.draw_polygons([boundary])
@@ -89,13 +90,15 @@ def run():
 
         drawer.update_robots([(rx, ry, rth)])
 
-        # Circle        
-        map_theta = atan2(ry, rx)
 
         # Tangent
-        vt = np.array([-sin(map_theta), cos(map_theta)])
-        # Atractor to the unitary radious
-        vr = ka * (np.array([cos(map_theta), sin(map_theta)]) - np.array([rx, ry]))
+        # vt = np.array([-sin(map_theta), cos(map_theta)])
+        clst = closest_on_polygon(Polygon(boundary), Point((rx, ry)))
+        vt = tanget_dir(clst, boundary)
+
+        # Attractor to the unitary radius
+        # vector to approach
+        vr = np.array([clst[0] - rx, clst[1] - ry])
 
         # Total vector
         vtotal = Attrac * vr + Omeg * vt
@@ -116,6 +119,25 @@ def run():
 
         velPub.publish(vel)
 
+
+def closest_on_polygon(poly, point):
+    """Closest point in a polygon to an external point
+    """
+    pol_ext = LinearRing(poly.exterior.coords)
+    d = pol_ext.project(point)
+    p = pol_ext.interpolate(d)
+    closest = list(p.coords)[0]
+    return closest
+
+def tanget_dir(point_in, points):
+    p = Point(point_in).buffer(.0001)
+    for p1, p2 in zip(points[:-1], points[1:]):
+
+        l = LineString([p1, p2])
+        if l.intersects(p):
+            vec = np.array(p2) - np.array(p1)
+            return vec / LA.norm(vec)
+    return None
 
 if __name__ == '__main__':
     try:

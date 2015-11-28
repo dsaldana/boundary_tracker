@@ -27,7 +27,9 @@ pose = None
 
 import matplotlib
 import matplotlib.pyplot as plt
-plt.ion() # set plot to animated
+
+plt.ion()  # set plot to animated
+
 
 def localization_callback(loc):
     global pose
@@ -52,6 +54,7 @@ def run():
     # attarction
     Attrac = .1
 
+    ka = 1.1
 
     drawer = RobotDrawer()
 
@@ -60,16 +63,15 @@ def run():
         rospy.sleep(0.1)
 
         if pose is None:
-            r =np.random.random(3)
-            drawer.update_robots([r])
             print 'Error: no localization.1'
             continue
 
         # Robot pose
         rx, ry = pose.position.x, pose.position.y
-        quat = [pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z]
-        rth = euler_from_quaternion(quat)[0]
+        quat = [ pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+        rth = euler_from_quaternion(quat)[2]
 
+        drawer.update_robots([(rx, ry, rth)])
 
         # Circle        
         map_theta = atan2(ry, rx)
@@ -77,7 +79,7 @@ def run():
         # Tangent
         vt = np.array([-sin(map_theta), cos(map_theta)])
         # Atractor to the unitary radious
-        vr = np.array([cos(map_theta), sin(map_theta)]) - np.array([rx, ry])
+        vr = ka * (np.array([cos(map_theta), sin(map_theta)]) - np.array([rx, ry]))
 
         # Total vector
         vtotal = Attrac * vr + Omeg * vt
@@ -87,13 +89,14 @@ def run():
         vel.linear.x = vtotal[0] * cos(rth) + vtotal[1] * sin(rth)
         vel.angular.z = -vtotal[0] * sin(rth) / .1 + vtotal[1] * cos(rth) / .1
 
-
+        # The angle is in the contrary direction
         # vel.angular.z = .2 * (atan2(vtotal[1], vtotal[0]) - rth)
         # vel.angular.z =  0.2 * (map_theta - rth + pi)
         # vel.angular.z =  0.2 * (0- rth)
         # print degrees(rth), degrees(atan2(ry, rx)), vel.angular.z
 
-        print vtotal
+        #vel.linear.x, vel.angular.z = 0., 0
+        print "v=%f w=%f" % (vel.linear.x, vel.angular.z)
 
         velPub.publish(vel)
 

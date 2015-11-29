@@ -8,12 +8,11 @@ from geometry_msgs.msg import Twist
 from geometry_msgs.msg import Point32
 
 from vicon.msg import Subject
+import time
 from robot_drawer import RobotDrawer
 import pickle
 from shapely.geometry import Polygon, LinearRing, Point, LineString
 from numpy import linalg as LA
-
-
 
 goal = Point32()
 goal.x = 0.0000001
@@ -54,24 +53,42 @@ def run():
     velPub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
 
+    # initial time
+    init_time = time.time()
+
     # Load boundaries
     boundaries = pickle.load(open("boundary.p", "rb"))
-    boundary_time = 0
+
+    log = []
+
 
 
     # Desired angular speed
     Omeg = .3
     # attarction
-    Attrac = 2.
-
+    Attrac = .6
 
     drawer = RobotDrawer()
+    vel = Twist()
+
 
     # ####### Control Loop ###########
     while not rospy.is_shutdown():
         rospy.sleep(0.1)
 
-        boundary = np.array(boundaries[149])
+        # Compute boundary time
+        t = time.time()
+        boundary_time = int(t - init_time) + 30
+
+        if boundary_time == len(boundaries):
+            pickle.dump(log, open("experiment%d.p" % t, "wb"))
+
+            # Stop the robot
+            vel.linear.x, vel.angular.z = 0., 0
+            velPub.publish(vel)
+            break
+
+        boundary = np.array(boundaries[boundary_time])
         boundary[:, 0] -= 1
         boundary[:, 1] -= .7
         boundary[:] *= 1.5
@@ -83,14 +100,14 @@ def run():
             continue
 
 
-        # Robot pose
+        ##### Robot pose
         rx, ry = pose.position.x, pose.position.y
         quat = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
         rth = euler_from_quaternion(quat)[2]
 
         drawer.update_robots([(rx, ry, rth)])
 
-
+        #### Control
         # Tangent
         # vt = np.array([-sin(map_theta), cos(map_theta)])
         clst = closest_on_polygon(Polygon(boundary), Point((rx, ry)))
@@ -103,19 +120,17 @@ def run():
         # Total vector
         vtotal = Attrac * vr + Omeg * vt
 
-        vel = Twist()
+
         # Feedback linearization
         vel.linear.x = vtotal[0] * cos(rth) + vtotal[1] * sin(rth)
         vel.angular.z = -vtotal[0] * sin(rth) / .1 + vtotal[1] * cos(rth) / .1
 
-        # The angle is in the contrary direction
-        # vel.angular.z = .2 * (atan2(vtotal[1], vtotal[0]) - rth)
-        # vel.angular.z =  0.2 * (map_theta - rth + pi)
-        # vel.angular.z =  0.2 * (0- rth)
-        # print degrees(rth), degrees(atan2(ry, rx)), vel.angular.z
+        ## LOG
+        log.append((boundary_time, t, rx, ry, rth))
 
         # vel.linear.x, vel.angular.z = 0., 0
-        print "v=%f w=%f" % (vel.linear.x, vel.angular.z)
+        # print "v=%f w=%f" % (vel.linear.x, vel.angular.z)
+        print boundary_time
 
         velPub.publish(vel)
 
@@ -129,6 +144,7 @@ def closest_on_polygon(poly, point):
     closest = list(p.coords)[0]
     return closest
 
+
 def tanget_dir(point_in, points):
     p = Point(point_in).buffer(.0001)
     for p1, p2 in zip(points[:-1], points[1:]):
@@ -138,6 +154,7 @@ def tanget_dir(point_in, points):
             vec = np.array(p2) - np.array(p1)
             return vec / LA.norm(vec)
     return None
+
 
 if __name__ == '__main__':
     try:
